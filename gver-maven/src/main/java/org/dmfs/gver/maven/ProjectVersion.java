@@ -6,19 +6,26 @@ import groovy.util.DelegatingScript;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.dmfs.gver.dsl.GitVersionConfig;
 import org.dmfs.gver.git.GitVersion;
 import org.dmfs.gver.git.changetypefacories.FirstOf;
-import org.dmfs.jems2.Fragile;
+import org.dmfs.jems2.FragileFunction;
+import org.dmfs.jems2.Function;
+import org.dmfs.jems2.iterable.Seq;
+import org.dmfs.jems2.optional.Mapped;
+import org.dmfs.jems2.optional.NullSafe;
+import org.dmfs.jems2.single.Backed;
+import org.dmfs.jems2.single.Collected;
+import org.dmfs.semver.Version;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,16 +34,30 @@ import java.util.Optional;
  */
 @Named
 @Singleton
-public final class Version implements Fragile<org.dmfs.semver.Version, MojoExecutionException>
+public final class ProjectVersion implements FragileFunction<Function<Version, Version>, Version, MojoExecutionException>
 {
     @Inject
     private MavenProject mProject;
 
+    private Version mVersion;
+
     @Override
-    public org.dmfs.semver.Version value() throws MojoExecutionException
+    public Version value(Function<Version, Version> decorator) throws MojoExecutionException
     {
-        Object pluginConfig = mProject.getBuildPlugins().stream().filter(plugin -> "gver-maven".equals(plugin.getArtifactId()))
-            .findFirst().map(Plugin::getConfiguration).map(c -> extractNestedStrings("config", (Xpp3Dom) c)).get();
+        // TODO get rid of null
+        if (mVersion != null)
+        {
+            return mVersion;
+        }
+
+        Object pluginConfig = mProject.getBuildPlugins()
+            .stream()
+            .filter(plugin -> "gver-maven".equals(plugin.getArtifactId()))
+            .findFirst()
+            .map(Plugin::getConfiguration)
+            .map(c -> extractNestedStrings("config", (Xpp3Dom) c))
+            .get();
+
         try
         {
             Repository repo = new FileRepositoryBuilder().setWorkTree(mProject.getBasedir()).build();
@@ -50,7 +71,7 @@ public final class Version implements Fragile<org.dmfs.semver.Version, MojoExecu
             configClosure.setDelegate(config);
             configClosure.run();
 
-            return new GitVersion(
+            mVersion = decorator.value(new GitVersion(
                 new FirstOf(config.mChangeTypeStrategy.mChangeTypeStrategies),
                 config.mSuffixes,
                 branch -> config.mPreReleaseStrategies.mBranchConfigs.stream()
@@ -59,7 +80,9 @@ public final class Version implements Fragile<org.dmfs.semver.Version, MojoExecu
                     .map(Optional::get)
                     .findFirst()
                     .orElse("alpha"))
-                .value(repo);
+                .value(repo));
+
+            return mVersion;
         }
         catch (Exception e)
         {
@@ -74,23 +97,13 @@ public final class Version implements Fragile<org.dmfs.semver.Version, MojoExecu
      * @param childname the name of the first subelement that contains the list
      * @param config    the actual config object
      */
-    private List extractNestedStrings(String childname, Xpp3Dom config)
+    private List<String> extractNestedStrings(String childname, Xpp3Dom config)
     {
-
-        final Xpp3Dom subelement = config.getChild(childname);
-        if (subelement != null)
-        {
-            List result = new LinkedList();
-            final Xpp3Dom[] children = subelement.getChildren();
-            for (int i = 0; i < children.length; i++)
-            {
-                final Xpp3Dom child = children[i];
-                result.add(child.getValue());
-            }
-            return result;
-        }
-
-        return null;
+        return new Backed<>(
+            new Mapped<>(dom -> new Collected<String, List<String>>(
+                ArrayList::new,
+                new org.dmfs.jems2.iterable.Mapped<>(Xpp3Dom::getValue, new Seq<>(dom.getChildren()))).value(),
+                new NullSafe<>(config.getChild(childname))), List::<String>of).value();
     }
 
 }

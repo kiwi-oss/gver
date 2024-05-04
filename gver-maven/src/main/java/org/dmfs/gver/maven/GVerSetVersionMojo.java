@@ -16,16 +16,16 @@ import javax.inject.Inject;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
 
 /**
- * Updates maven project with current version.
+ * Updates maven project to current version.
  */
 @Mojo(name = "set-version")
 @Execute(goal = "set-version")
 public final class GVerSetVersionMojo extends AbstractMojo
 {
     @Inject
-    private Version version;
+    private ProjectVersion projectVersion;
 
-    @Parameter(name = "config", defaultValue = "{}", readonly = true, required = true)
+    @Parameter(name = "config", defaultValue = "{ changes { follow conventionalCommits }}", readonly = true, required = true)
     private Object config;
 
     @Parameter(defaultValue = "${project}", readonly = true)
@@ -48,7 +48,7 @@ public final class GVerSetVersionMojo extends AbstractMojo
             ),
             goal("set"),
             configuration(
-                element(name("newVersion"), new VersionSequence(version.value()).toString()),
+                element(name("newVersion"), new VersionSequence(projectVersion.value(i -> i)).toString()),
                 element(name("generateBackupPoms"), "false")
             ),
             executionEnvironment(

@@ -18,9 +18,9 @@ import javax.inject.Inject;
 public final class GVerPrintVersionMojo extends AbstractMojo
 {
     @Inject
-    private Version version;
+    private ProjectVersion projectVersion;
 
-    @Parameter(name = "config", defaultValue = "{}", readonly = true, required = true)
+    @Parameter(name = "config", defaultValue = "{ changes { follow conventionalCommits }}", readonly = true, required = true)
     private Object config;
 
     @Parameter(defaultValue = "${project}", readonly = true)
@@ -30,6 +30,6 @@ public final class GVerPrintVersionMojo extends AbstractMojo
     @Override
     public void execute() throws MojoExecutionException
     {
-        System.out.println(new VersionSequence(version.value()));
+        System.out.println(new VersionSequence(projectVersion.value(i -> i)));
     }
 }
