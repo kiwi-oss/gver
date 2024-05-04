@@ -12,6 +12,8 @@ import org.apache.maven.project.MavenProject;
 import org.dmfs.semver.Release;
 import org.dmfs.semver.VersionSequence;
 
+import javax.inject.Inject;
+
 import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
 
 /**
@@ -21,6 +23,9 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
 @Execute(goal = "set-release-version")
 public final class GVerSetReleaseVersionMojo extends AbstractMojo
 {
+    @Inject
+    private Version version;
+
     @Parameter(name = "config", defaultValue = "{}", readonly = true, required = true)
     private Object config;
 
@@ -44,7 +49,7 @@ public final class GVerSetReleaseVersionMojo extends AbstractMojo
             ),
             goal("set"),
             configuration(
-                element(name("newVersion"), new VersionSequence(new Release(new Version(mavenProject, config).value())).toString()),
+                element(name("newVersion"), new VersionSequence(new Release(version.value())).toString()),
                 element(name("generateBackupPoms"), "false")
             ),
             executionEnvironment(

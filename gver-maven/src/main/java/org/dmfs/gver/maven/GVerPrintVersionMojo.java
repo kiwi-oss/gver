@@ -8,6 +8,8 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.dmfs.semver.VersionSequence;
 
+import javax.inject.Inject;
+
 /**
  * Prints the current project version to the output screen.
  */
@@ -15,6 +17,9 @@ import org.dmfs.semver.VersionSequence;
 @Execute(goal = "print-version")
 public final class GVerPrintVersionMojo extends AbstractMojo
 {
+    @Inject
+    private Version version;
+
     @Parameter(name = "config", defaultValue = "{}", readonly = true, required = true)
     private Object config;
 
@@ -25,6 +30,6 @@ public final class GVerPrintVersionMojo extends AbstractMojo
     @Override
     public void execute() throws MojoExecutionException
     {
-        System.out.println(new VersionSequence(new Version(project, config).value()));
+        System.out.println(new VersionSequence(version.value()));
     }
 }
