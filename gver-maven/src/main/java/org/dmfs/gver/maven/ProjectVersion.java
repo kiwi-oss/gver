@@ -13,11 +13,9 @@ import org.dmfs.gver.git.GitVersion;
 import org.dmfs.gver.git.changetypefacories.FirstOf;
 import org.dmfs.jems2.FragileFunction;
 import org.dmfs.jems2.Function;
-import org.dmfs.jems2.iterable.Seq;
 import org.dmfs.jems2.optional.Mapped;
 import org.dmfs.jems2.optional.NullSafe;
 import org.dmfs.jems2.single.Backed;
-import org.dmfs.jems2.single.Collected;
 import org.dmfs.semver.Version;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -25,8 +23,6 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -55,12 +51,12 @@ public final class ProjectVersion implements FragileFunction<Function<Version, V
             .filter(plugin -> "gver-maven".equals(plugin.getArtifactId()))
             .findFirst()
             .map(Plugin::getConfiguration)
-            .map(c -> extractNestedStrings("config", (Xpp3Dom) c))
+            .map(c -> extractNestedString("config", (Xpp3Dom) c))
             .get();
 
         try
         {
-            Repository repo = new FileRepositoryBuilder().setWorkTree(mProject.getBasedir()).build();
+            Repository repo = new FileRepositoryBuilder().findGitDir(mProject.getBasedir()).setMustExist(true).build();
 
             CompilerConfiguration cc = new CompilerConfiguration();
             cc.setScriptBaseClass(DelegatingScript.class.getName());
@@ -97,13 +93,11 @@ public final class ProjectVersion implements FragileFunction<Function<Version, V
      * @param childname the name of the first subelement that contains the list
      * @param config    the actual config object
      */
-    private List<String> extractNestedStrings(String childname, Xpp3Dom config)
+    private String extractNestedString(String childname, Xpp3Dom config)
     {
         return new Backed<>(
-            new Mapped<>(dom -> new Collected<String, List<String>>(
-                ArrayList::new,
-                new org.dmfs.jems2.iterable.Mapped<>(Xpp3Dom::getValue, new Seq<>(dom.getChildren()))).value(),
-                new NullSafe<>(config.getChild(childname))), List::<String>of).value();
+            new Mapped<>(Xpp3Dom::getValue,
+                new NullSafe<>(config.getChild(childname))), "").value();
     }
 
 }
